@@ -20,14 +20,18 @@ def get_products_json_path() -> Path:
     return (repo_root.parent / "python-playwright-scraper" / "products.json").resolve()
 
 
-class Product(BaseModel):
-    name: str
+class ProductPriceSnapshot(BaseModel):
     price: str
     unit_price: Optional[str] = None
+    source_url: Optional[str] = None
+    scraped_at: str
+
+
+class Product(BaseModel):
+    name: str
     packaging_format: Optional[str] = None
     image: Optional[str] = None
-    source_url: Optional[str] = None
-    scraped_at: Optional[str] = None
+    prices: list[ProductPriceSnapshot] = []
 
 
 app = FastAPI(title="Products API", version="0.1.0")
@@ -66,6 +70,22 @@ def load_products() -> list[Product]:
         if not isinstance(item, dict):
             continue
         try:
+            # Backward compatibility: older scraper format had price/unit_price at top-level.
+            if "prices" not in item and "price" in item:
+                item = {
+                    "name": item.get("name"),
+                    "packaging_format": item.get("packaging_format"),
+                    "image": item.get("image"),
+                    "prices": [
+                        {
+                            "price": item.get("price"),
+                            "unit_price": item.get("unit_price"),
+                            "source_url": item.get("source_url"),
+                            "scraped_at": item.get("scraped_at") or "",
+                        }
+                    ],
+                }
+
             products.append(Product(**item))
         except Exception:
             # Skip malformed entries
