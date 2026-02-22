@@ -75,6 +75,7 @@ def build_product_views() -> list[dict[str, Any]]:
                 "unit_price": latest.get("unit_price") or None,
                 "source_url": latest.get("source_url") or None,
                 "scraped_at": latest.get("scraped_at") or None,
+                "supermarket_name": latest.get("supermarket_name") or None,
             }
         )
 

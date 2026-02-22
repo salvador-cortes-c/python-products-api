@@ -37,6 +37,7 @@ class Product(BaseModel):
 
 class ProductPriceSnapshot(BaseModel):
     product_key: str
+    supermarket_name: Optional[str] = None
     price: str
     unit_price: Optional[str] = None
     source_url: Optional[str] = None
@@ -52,6 +53,7 @@ class ProductView(BaseModel):
     unit_price: Optional[str] = None
     source_url: Optional[str] = None
     scraped_at: Optional[str] = None
+    supermarket_name: Optional[str] = None
 
 
 app = FastAPI(title="Products API", version="0.1.0")
@@ -152,6 +154,7 @@ def load_product_views() -> list[ProductView]:
                 unit_price=latest.unit_price if latest else None,
                 source_url=latest.source_url if latest else None,
                 scraped_at=latest.scraped_at if latest else None,
+                supermarket_name=latest.supermarket_name if latest else None,
             )
         )
 
