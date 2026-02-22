@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 .DS_Store
 
+# Playwright (should live in scraper repo, but can be created accidentally)
+storage_state.json
+
 # Env
 .env
 
