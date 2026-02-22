@@ -24,6 +24,7 @@ class Product(BaseModel):
     name: str
     price: str
     unit_price: Optional[str] = None
+    packaging_format: Optional[str] = None
     image: Optional[str] = None
     source_url: Optional[str] = None
     scraped_at: Optional[str] = None
