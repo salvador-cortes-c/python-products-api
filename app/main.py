@@ -56,6 +56,21 @@ class ProductView(BaseModel):
     supermarket_name: Optional[str] = None
 
 
+class StorePrice(BaseModel):
+    price: str
+    unit_price: Optional[str] = None
+    source_url: Optional[str] = None
+    scraped_at: Optional[str] = None
+
+
+class ProductCompareView(BaseModel):
+    product_key: str
+    name: str
+    packaging_format: Optional[str] = None
+    image: Optional[str] = None
+    prices_by_store: dict[str, StorePrice]
+
+
 app = FastAPI(title="Products API", version="0.1.0")
 
 app.add_middleware(
@@ -190,3 +205,73 @@ def search_products(
     matches = [p for p in products if query in p.name.lower()]
     matches.sort(key=score)
     return matches[:limit]
+
+
+@app.get("/products/compare", response_model=list[ProductCompareView])
+def compare_products(
+    key: list[str] = Query(default=[]),
+) -> list[ProductCompareView]:
+    requested_keys = [k.strip().lower() for k in key if isinstance(k, str) and k.strip()]
+    if not requested_keys:
+        return []
+
+    # Preserve request order, de-dupe
+    unique_keys: list[str] = []
+    seen: set[str] = set()
+    for k in requested_keys:
+        if k in seen:
+            continue
+        seen.add(k)
+        unique_keys.append(k)
+
+    products_path = get_products_json_path()
+    products = load_products()
+    snapshots = load_price_snapshots(products_path)
+
+    product_by_key: dict[str, Product] = {}
+    for product in products:
+        computed_key = product.product_key
+        if not computed_key:
+            computed_key = f"{(product.name or '').strip()}__{(product.packaging_format or '').strip()}".lower()
+        product_by_key[computed_key] = product
+
+    latest_by_product_store: dict[tuple[str, str], ProductPriceSnapshot] = {}
+    target_set = set(unique_keys)
+    for snap in snapshots:
+        product_key = (snap.product_key or "").strip().lower()
+        if product_key not in target_set:
+            continue
+        store = (snap.supermarket_name or "").strip()
+        if not store:
+            continue
+
+        tuple_key = (product_key, store)
+        current = latest_by_product_store.get(tuple_key)
+        if current is None or snap.scraped_at >= current.scraped_at:
+            latest_by_product_store[tuple_key] = snap
+
+    result: list[ProductCompareView] = []
+    for product_key in unique_keys:
+        product = product_by_key.get(product_key)
+        prices_by_store: dict[str, StorePrice] = {}
+        for (snap_key, store), snap in latest_by_product_store.items():
+            if snap_key != product_key:
+                continue
+            prices_by_store[store] = StorePrice(
+                price=snap.price,
+                unit_price=snap.unit_price,
+                source_url=snap.source_url,
+                scraped_at=snap.scraped_at,
+            )
+
+        result.append(
+            ProductCompareView(
+                product_key=product_key,
+                name=product.name if product else product_key,
+                packaging_format=product.packaging_format if product else None,
+                image=product.image if product else None,
+                prices_by_store=prices_by_store,
+            )
+        )
+
+    return result
